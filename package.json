@@ -1,0 +1,16 @@
+{
+  "name": "amble-espeak-ng-addon",
+  "version": "1.52.0-1",
+  "private": true,
+  "description": "Build and verify the Amble pronunciation add-on: the unmodified eSpeak NG program, packaged with its licences.",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "jszip": "3.10.1"
+  }
+}

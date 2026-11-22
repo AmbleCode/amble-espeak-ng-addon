@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Builds the add-on and its matching source archive and creates a DRAFT release. A person reviews the draft
+# against docs/COMPLIANCE.md and publishes it. This workflow has not been run yet.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v1.52.0-1"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      UPSTREAM_VERSION: "1.52.0"
+      UPSTREAM_COMMIT: "4870adfa25b1a32b4361592f1be8a40337c58d6c"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+
+      - name: Refuse to release with an unfilled source-request address
+        shell: bash
+        run: |
+          if grep -q '<<OWNER' SOURCE-OFFER.md; then
+            echo "SOURCE-OFFER.md still has the placeholder contact address"; exit 1
+          fi
+
+      - name: Check the tag matches the package version
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          [ "$TAG" = "v$version" ] || { echo "tag $TAG does not match package version $version"; exit 1; }
+
+      - run: npm ci --ignore-scripts
+
+      - name: Build and verify the package
+        shell: bash
+        run: |
+          node scripts/build.mjs --out dist --download
+          node scripts/verify.mjs dist/amble-espeak-ng-win32-x64-*.zip
+
+      - name: Make the matching source archive from the pinned upstream commit
+        shell: bash
+        run: |
+          git clone --quiet https://github.com/espeak-ng/espeak-ng.git upstream
+          git -C upstream checkout --quiet "$UPSTREAM_COMMIT"
+          [ "$(git -C upstream rev-parse HEAD)" = "$UPSTREAM_COMMIT" ]
+          git -C upstream archive --format=tar.gz --prefix="espeak-ng-$UPSTREAM_VERSION/" \
+            -o "../dist/espeak-ng-$UPSTREAM_VERSION-source.tar.gz" HEAD
+
+      - name: Write checksums
+        shell: bash
+        run: |
+          cd dist
+          sha256sum amble-espeak-ng-*.zip espeak-ng-*-source.tar.gz > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create a draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" dist/* --draft --title "eSpeak NG $UPSTREAM_VERSION add-on ($TAG)" \
+            --notes "Unmodified eSpeak NG $UPSTREAM_VERSION for Amble. The matching source is attached. Licence and compliance: docs/COMPLIANCE.md."
