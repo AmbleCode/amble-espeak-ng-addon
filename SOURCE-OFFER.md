@@ -11,6 +11,6 @@ This offer is valid for at least three years after you received the package.
 
 Send requests to:
 
-<<OWNER: add the postal address or email address for written source requests, then delete this line>>
+support@lyrestudio.net
 
 Include the package file name and the date you received it.
